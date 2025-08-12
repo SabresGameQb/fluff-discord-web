@@ -1,24 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Fluff (Liar's Dice) Game</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-    h1 { color: #4a90e2; }
-    p { font-size: 1.1em; }
-    a { color: #4a90e2; text-decoration: none; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fluff (Liar's Dice) Online</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Welcome to Fluff (Liar's Dice) Online!</h1>
-  <p>Invite your friends to join by sharing this link.</p>
-  <p>To start a game:</p>
-  <ul>
-    <li>Open the game link in your browser.</li>
-    <li>Create or join a game room.</li>
-    <li>Use the chat commands to play together.</li>
-  </ul>
-  <p>Enjoy!</p>
+  <div id="lobby" class="container">
+    <h1>Fluff (Liar's Dice)</h1>
+    <input id="roomInput" placeholder="Enter room ID or create new" />
+    <button id="joinBtn">Join Room</button>
+    <p id="status"></p>
+  </div>
+
+  <div id="game" class="container" style="display:none;">
+    <h2>Room: <span id="roomId"></span></h2>
+    <div id="playersList"></div>
+    <div id="diceArea"></div>
+    <div id="bidsArea"></div>
+
+    <div id="actions">
+      <input type="number" id="bidCount" min="1" placeholder="Count" />
+      <input type="number" id="bidFace" min="1" max="6" placeholder="Face (1-6)" />
+      <button id="placeBidBtn">Place Bid</button>
+      <button id="callFluffBtn">Call Fluff</button>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  const lobby = document.getElementById('lobby');
+  const game = document.getElementById('game');
+  const roomInput = document.getElementById('roomInput');
+  const joinBtn = document.getElementById('joinBtn');
+  const status = document.getElementById('status');
+  const roomIdDisplay = document.getElementById('roomId');
+  const playersList = document.getElementById('playersList');
+  const diceArea = document.getElementById('diceArea');
+  const bidsArea = document.getElementById('bidsArea');
+  const logDiv = document.getElementById('log');
+  const bidCountInput = document.getElementById('bidCount');
+  const bidFaceInput = document.getElementById('bidFace');
+  const placeBidBtn = document.getElementById('placeBidBtn');
+  const callFluffBtn = document.getElementById('callFluffBtn');
+
+  let currentRoom = null;
+
+  joinBtn.onclick = () => {
+    const room = roomInput.value.trim();
+    if (!room) {
+      status.textContent = 'Please enter a room ID!';
+      return;
+    }
+    socket.emit('joinRoom', room);
+  };
+
+  placeBidBtn.onclick = () => {
+    const count = parseInt(bidCountInput.value);
+    const face = parseInt(bidFaceInput.value);
+    if (!count || !face || face < 1 || face > 6) {
+      alert('Please enter a valid bid count and face (1-6).');
+      return;
+    }
+    socket.emit('placeBid', { count, face });
+  };
+
+  callFluffBtn.onclick = () => {
+    socket.emit('callFluff');
+  };
+
+  socket.on('joinedRoom', (room) => {
+    currentRoom = room;
+    lobby.style.display = 'none';
+    game.style.display = 'block';
+    roomIdDisplay.textContent = room;
+    logDiv.innerHTML = '';
+    status.textContent = '';
+  });
+
+  socket.on('updatePlayers', (players) => {
+    playersList.innerHTML = '<h3>Players:</h3><ul>' + players.map(p => `<li>${p}</li>`).join('') + '</ul>';
+  });
+
+  socket.on('updateDice', (dice) => {
+    diceArea.innerHTML = '<h3>Your Dice:</h3>' + dice.map(d => `<span class="die">${d}</span>`).join(' ');
+  });
+
+  socket.on('updateBids', (bids) => {
+    bidsArea.innerHTML = '<h3>Current Bids:</h3><ul>' + bids.map(b => `<li>${b.count} × ${b.face}'s by ${b.player}</li>`).join('') + '</ul>';
+  });
+
+  socket.on('log', (msg) => {
+    logDiv.innerHTML += `<p>${msg}</p>`;
+    logDiv.scrollTop = logDiv.scrollHeight;
+  });
+
+  socket.on('errorMsg', (msg) => {
+    alert(msg);
+  });
+
+</script>
 </body>
 </html>
