@@ -18,12 +18,9 @@ function rollDice(num) {
   return dice;
 }
 
-// Calculate total dice count in room
-function totalDiceCount(players) {
-  return Object.values(players).reduce((acc, p) => acc + p.dice.length, 0);
-}
-
 io.on('connection', (socket) => {
+  console.log(`User connected: ${socket.id}`);
+
   socket.on('joinRoom', (room) => {
     socket.join(room);
 
@@ -72,6 +69,7 @@ io.on('connection', (socket) => {
 
     // Notify turn
     io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
+    io.to(room).emit('currentTurn', game.currentTurn);
   });
 
   socket.on('placeBid', ({ count, face }) => {
@@ -86,7 +84,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check bid validity (simple check)
     if (game.bids.length > 0) {
       const lastBid = game.bids[game.bids.length -1];
       if (count < lastBid.count || (count === lastBid.count && face <= lastBid.face)) {
@@ -110,6 +107,7 @@ io.on('connection', (socket) => {
     game.currentTurn = game.order[(currentIndex + 1) % game.order.length];
 
     io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
+    io.to(room).emit('currentTurn', game.currentTurn);
   });
 
   socket.on('callFluff', () => {
@@ -119,8 +117,9 @@ io.on('connection', (socket) => {
     const game = games[room];
     if (!game) return;
 
-    if (socket.id === game.currentTurn) {
-      socket.emit('errorMsg', 'You cannot call fluff on your own turn!');
+    // ONLY the current player can call fluff
+    if (socket.id !== game.currentTurn) {
+      socket.emit('errorMsg', 'You can only call fluff on your own turn!');
       return;
     }
 
@@ -129,7 +128,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const lastBid = game.bids[game.bids.length -1];
+    const lastBid = game.bids[game.bids.length - 1];
 
     // Count dice matching face across all players
     let totalMatching = 0;
@@ -144,10 +143,15 @@ io.on('connection', (socket) => {
       // Bid was correct - caller loses a die
       game.players[socket.id].dice.pop();
       io.to(room).emit('log', `${game.players[socket.id].name} loses a die!`);
+      // Turn moves to next player (after caller)
+      const idx = game.order.indexOf(socket.id);
+      game.currentTurn = game.order[(idx + 1) % game.order.length];
     } else {
       // Bid was incorrect - bidder loses a die
       game.players[lastBid.playerId].dice.pop();
       io.to(room).emit('log', `${game.players[lastBid.playerId].name} loses a die!`);
+      // Turn moves to the bidder (loser)
+      game.currentTurn = lastBid.playerId;
     }
 
     // Reset bids
@@ -164,10 +168,8 @@ io.on('connection', (socket) => {
     for (const [id, p] of Object.entries(game.players)) {
       if (p.dice.length === 0) {
         io.to(room).emit('log', `${p.name} is out of the game.`);
-        // Remove player
         delete game.players[id];
         game.order = game.order.filter(pid => pid !== id);
-        // If currentTurn was removed, advance turn
         if (game.currentTurn === id && game.order.length > 0) {
           game.currentTurn = game.order[0];
         }
@@ -177,21 +179,15 @@ io.on('connection', (socket) => {
     // Check for winner
     if (game.order.length === 1) {
       io.to(room).emit('log', `${game.players[game.order[0]].name} wins the game!`);
-      // Reset game
       delete games[room];
       return;
     }
 
-    // Advance turn if currentTurn player still exists
-    if (!game.order.includes(game.currentTurn)) {
-      game.currentTurn = game.order[0];
-    }
-
     io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
+    io.to(room).emit('currentTurn', game.currentTurn);
   });
 
   socket.on('disconnect', () => {
-    // Remove player from all games
     for (const [room, game] of Object.entries(games)) {
       if (game.players[socket.id]) {
         io.to(room).emit('log', `${game.players[socket.id].name} disconnected.`);
@@ -201,8 +197,8 @@ io.on('connection', (socket) => {
         if (game.currentTurn === socket.id && game.order.length > 0) {
           game.currentTurn = game.order[0];
           io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
+          io.to(room).emit('currentTurn', game.currentTurn);
         }
-        // Remove game if no players left
         if (game.order.length === 0) {
           delete games[room];
         }
