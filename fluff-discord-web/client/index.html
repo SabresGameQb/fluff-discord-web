@@ -1,36 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Fluff Game</title>
-  <link rel="stylesheet" href="style.css" />
+    <title>Fluff Discord Web</title>
 </head>
 <body>
+    <input id="name" placeholder="Your name">
+    <input id="room" placeholder="Room name">
+    <button id="joinBtn">Join Room</button>
 
-<div id="joinCard">
-  <h2>Join Game</h2>
-  <input id="name" placeholder="Your name" />
-  <input id="room" placeholder="Room ID" />
-  <button id="joinBtn">Join Room</button>
-  <p id="joinStatus"></p>
-</div>
-
-<div id="gameCard" style="display:none;">
-  <h2>Room: <span id="roomId"></span></h2>
-  <ul id="playersList"></ul>
-  <p>Your dice: <span id="yourDice"></span></p>
-  <p>Current bid: <span id="currentBid">—</span></p>
-  <p id="turnInfo"></p>
-  
-  <input id="bidQty" type="number" placeholder="Qty" />
-  <input id="bidFace" type="number" placeholder="Face" />
-  <button id="placeBid">Place Bid</button>
-  <button id="callBtn">Call Fluff</button>
-  
-  <div id="roundLog"></div>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="client.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
 </body>
 </html>
