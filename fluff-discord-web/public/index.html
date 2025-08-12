@@ -1,163 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Fluff (Liar's Dice) Online</title>
-<style>
-  body {
-    background: #121212;
-    color: #eee;
-    font-family: Arial, sans-serif;
-    margin: 20px;
-  }
-  input, button {
-    font-size: 1rem;
-    padding: 8px;
-    margin: 5px 0;
-    border: none;
-    border-radius: 4px;
-  }
-  input {
-    width: 200px;
-    background: #222;
-    color: #eee;
-  }
-  button {
-    background: #6200ee;
-    color: white;
-    cursor: pointer;
-  }
-  button:disabled {
-    background: #444;
-    cursor: not-allowed;
-  }
-  #gameArea {
-    margin-top: 20px;
-  }
-  #log {
-    background: #222;
-    padding: 10px;
-    height: 150px;
-    overflow-y: scroll;
-    border-radius: 4px;
-    margin-top: 10px;
-  }
-</style>
+    <meta charset="UTF-8">
+    <title>Fluff Dice Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        input, button {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #555;
+            cursor: pointer;
+        }
+        #game-area {
+            display: none;
+            margin-top: 20px;
+        }
+        #player-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        #player-list li {
+            padding: 5px 0;
+        }
+        .section {
+            margin: 20px 0;
+        }
+        label {
+            display: inline-block;
+            width: 70px;
+        }
+    </style>
 </head>
 <body>
+    <h1>🎲 Fluff Dice Game 🎲</h1>
 
-<h1>Fluff (Liar's Dice) Online</h1>
+    <form id="room-form">
+        <div class="section">
+            <label for="room-id">Room:</label>
+            <input type="text" id="room-id" placeholder="Enter room ID" required>
+            <button type="submit">Join</button>
+        </div>
+    </form>
 
-<div id="joinArea">
-  <input id="nameInput" type="text" placeholder="Your name" />
-  <input id="roomInput" type="text" placeholder="Room ID" />
-  <button id="joinBtn">Join Room</button>
-</div>
+    <div id="game-area">
+        <div class="section">
+            <h2>Players</h2>
+            <ul id="player-list"></ul>
+        </div>
 
-<div id="gameArea" style="display:none;">
-  <div>
-    <strong>Players:</strong> <span id="players"></span>
-  </div>
-  <div>
-    <strong>Your Dice:</strong> <span id="dice"></span>
-  </div>
-  <div>
-    <input id="bidCount" type="number" min="1" placeholder="Count" />
-    <input id="bidFace" type="number" min="1" max="6" placeholder="Face (1-6)" />
-    <button id="placeBidBtn" disabled>Place Bid</button>
-    <button id="callFluffBtn" disabled>Call Fluff</button>
-  </div>
-  <div id="status"></div>
-  <div id="log"></div>
-</div>
+        <div class="section">
+            <h2>Current Bid</h2>
+            <p id="current-bid">No current bid</p>
+        </div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  const socket = io();
+        <div class="section">
+            <form id="bid-form">
+                <label for="quantity">Qty:</label>
+                <input type="number" id="quantity" min="1" required>
+                <label for="face">Face:</label>
+                <input type="number" id="face" min="1" max="6" required>
+                <button type="submit">Bid</button>
+            </form>
+        </div>
 
-  const joinBtn = document.getElementById('joinBtn');
-  const nameInput = document.getElementById('nameInput');
-  const roomInput = document.getElementById('roomInput');
-  const gameArea = document.getElementById('gameArea');
-  const playersSpan = document.getElementById('players');
-  const diceSpan = document.getElementById('dice');
-  const bidCount = document.getElementById('bidCount');
-  const bidFace = document.getElementById('bidFace');
-  const placeBidBtn = document.getElementById('placeBidBtn');
-  const callFluffBtn = document.getElementById('callFluffBtn');
-  const status = document.getElementById('status');
-  const log = document.getElementById('log');
-  const joinArea = document.getElementById('joinArea');
+        <div class="section">
+            <button id="fluff-button">Call Fluff</button>
+        </div>
+    </div>
 
-  let mySocketId = null;
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
 
-  joinBtn.onclick = () => {
-    const name = nameInput.value.trim();
-    const room = roomInput.value.trim();
-    if (!room) {
-      alert('Please enter a Room ID');
-      return;
-    }
-    if (!name) {
-      alert('Please enter your name');
-      return;
-    }
-    socket.emit('joinRoom', { room, name });
-  };
+        let playerName = localStorage.getItem("fluffName") || "";
+        if (!playerName) {
+            playerName = prompt("Enter your name:") || "Player";
+            localStorage.setItem("fluffName", playerName);
+        }
+        socket.emit("setName", playerName);
 
-  socket.on('connect', () => {
-    mySocketId = socket.id;
-  });
+        const roomForm = document.getElementById("room-form");
+        const roomInput = document.getElementById("room-id");
+        const gameArea = document.getElementById("game-area");
+        const currentBidDisplay = document.getElementById("current-bid");
+        const playerList = document.getElementById("player-list");
+        const bidForm = document.getElementById("bid-form");
+        const quantityInput = document.getElementById("quantity");
+        const faceInput = document.getElementById("face");
+        const fluffButton = document.getElementById("fluff-button");
 
-  socket.on('joinedRoom', (room) => {
-    joinArea.style.display = 'none';
-    gameArea.style.display = 'block';
-  });
+        let myTurn = false;
+        let lastBid = null;
 
-  socket.on('updatePlayers', (players) => {
-    playersSpan.textContent = players.join(', ');
-  });
+        roomForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const roomId = roomInput.value.trim();
+            if (roomId) {
+                socket.emit("joinRoom", { roomId, name: playerName });
+            }
+        });
 
-  socket.on('updateDice', (dice) => {
-    diceSpan.textContent = dice.join(', ');
-  });
+        bidForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const quantity = parseInt(quantityInput.value);
+            const face = parseInt(faceInput.value);
+            if (validateBid(quantity, face)) {
+                socket.emit("makeBid", { quantity, face });
+            } else {
+                alert("Invalid bid based on Fluff rules!");
+            }
+        });
 
-  socket.on('updateBids', (bids) => {
-    // Optional: display current bids
-  });
+        fluffButton.addEventListener("click", () => {
+            if (lastBid) {
+                socket.emit("callFluff");
+            } else {
+                alert("No bid to call Fluff on!");
+            }
+        });
 
-  socket.on('log', (msg) => {
-    log.innerHTML += `<div>${msg}</div>`;
-    log.scrollTop = log.scrollHeight;
-  });
+        socket.on("gameJoined", (players) => {
+            roomForm.style.display = "none";
+            gameArea.style.display = "block";
+            updatePlayers(players);
+        });
 
-  socket.on('errorMsg', (msg) => {
-    alert(msg);
-  });
+        socket.on("updatePlayers", (players) => {
+            updatePlayers(players);
+        });
 
-  socket.on('currentTurn', (playerId) => {
-    const isMyTurn = (playerId === mySocketId);
-    placeBidBtn.disabled = !isMyTurn;
-    callFluffBtn.disabled = !isMyTurn;
-    status.textContent = isMyTurn ? "It's your turn!" : "Waiting for other players...";
-  });
+        socket.on("turn", (player) => {
+            myTurn = player.name === playerName;
+            if (myTurn) {
+                alert("It's your turn!");
+            }
+        });
 
-  placeBidBtn.onclick = () => {
-    const count = parseInt(bidCount.value);
-    const face = parseInt(bidFace.value);
-    if (!count || !face || face < 1 || face > 6 || count < 1) {
-      alert('Enter valid bid count and face (1-6)');
-      return;
-    }
-    socket.emit('placeBid', { count, face });
-    bidCount.value = '';
-    bidFace.value = '';
-  };
+        socket.on("bidMade", (bid) => {
+            lastBid = bid;
+            currentBidDisplay.innerText = `${bid.quantity} × ${bid.face}s (Total: ${bid.quantity * bid.face})`;
+        });
 
-  callFluffBtn.onclick = () => {
-    socket.emit('callFluff');
-  };
-</script>
+        socket.on("fluffResult", (result) => {
+            alert(result.message);
+            lastBid = null;
+            currentBidDisplay.innerText = "No current bid";
+        });
+
+        function updatePlayers(players) {
+            playerList.innerHTML = "";
+            players.forEach(p => {
+                const li = document.createElement("li");
+                li.innerText = p.name;
+                playerList.appendChild(li);
+            });
+        }
+
+        function validateBid(quantity, face) {
+            if (!lastBid) return true; // First bid is always valid
+            const newTotal = quantity * face;
+            const lastTotal = lastBid.quantity * lastBid.face;
+
+            // Must be higher total, OR equal total with different combo
+            if (newTotal > lastTotal) return true;
+            if (newTotal === lastTotal && (quantity !== lastBid.quantity || face !== lastBid.face)) return true;
+            return false;
+        }
+    </script>
 </body>
 </html>
