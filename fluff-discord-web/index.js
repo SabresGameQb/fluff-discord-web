@@ -1,199 +1,105 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
-const PORT = process.env.PORT || 3000;
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
+const path = require("path");
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, "public")));
 
-const games = {};
+let games = {};
 
-function rollDice(num) {
-  const dice = [];
-  for (let i = 0; i < num; i++) {
-    dice.push(Math.floor(Math.random() * 6) + 1);
-  }
-  return dice;
+function createGame(roomId) {
+    games[roomId] = {
+        players: [],
+        currentBid: null,
+        turnIndex: 0,
+        dice: {},
+        started: false
+    };
 }
 
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+function nextTurn(roomId) {
+    let game = games[roomId];
+    game.turnIndex = (game.turnIndex + 1) % game.players.length;
+    io.to(roomId).emit("turn", {
+        player: game.players[game.turnIndex].name
+    });
+}
 
-  socket.on('joinRoom', ({ room, name }) => {
-    console.log(`joinRoom data: room=${room}, name=${name}`);
+function isValidBid(newBid, currentBid) {
+    if (!currentBid) return true;
 
-    socket.join(room);
+    const newTotal = newBid.quantity * newBid.face;
+    const currTotal = currentBid.quantity * currentBid.face;
 
-    if (!games[room]) {
-      games[room] = {
-        players: {},  // socket.id: { name, dice }
-        bids: [],
-        currentTurn: null,
-        order: [],
-        started: false,
-      };
+    if (newTotal > currTotal) return true;
+    if (newTotal === currTotal) {
+        // Same total allowed only if quantity/face combo is different
+        return !(newBid.quantity === currentBid.quantity && newBid.face === currentBid.face);
     }
-    const game = games[room];
+    return false;
+}
 
-    const playerName = name?.trim() || `Player${Object.keys(game.players).length + 1}`;
+io.on("connection", socket => {
+    socket.on("createGame", ({ roomId, playerName }) => {
+        createGame(roomId);
+        games[roomId].players.push({ id: socket.id, name: playerName });
+        socket.join(roomId);
+        io.to(roomId).emit("gameUpdate", games[roomId]);
+    });
 
-    game.players[socket.id] = {
-      name: playerName,
-      dice: rollDice(5),
-    };
+    socket.on("joinGame", ({ roomId, playerName }) => {
+        if (!games[roomId]) return;
+        games[roomId].players.push({ id: socket.id, name: playerName });
+        socket.join(roomId);
+        io.to(roomId).emit("gameUpdate", games[roomId]);
+    });
 
-    game.order = Object.keys(game.players);
+    socket.on("startGame", roomId => {
+        let game = games[roomId];
+        if (!game) return;
+        game.started = true;
+        game.turnIndex = 0;
+        io.to(roomId).emit("turn", { player: game.players[0].name });
+    });
 
-    if (!game.started) {
-      game.started = true;
-      game.currentTurn = game.order[0];
-    }
+    socket.on("bid", ({ roomId, quantity, face }) => {
+        let game = games[roomId];
+        if (!game) return;
 
-    socket.emit('joinedRoom', room);
-    io.to(room).emit('updatePlayers', Object.values(game.players).map(p => p.name));
-    socket.emit('updateDice', game.players[socket.id].dice);
-    io.to(room).emit('updateBids', game.bids.map(b => ({
-      count: b.count,
-      face: b.face,
-      player: game.players[b.playerId]?.name || 'Unknown',
-    })));
-
-    io.to(room).emit('log', `${playerName} joined the room.`);
-    io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
-    io.to(room).emit('currentTurn', game.currentTurn);
-
-    console.log(`Players in room ${room}:`, game.players);
-    console.log(`Current turn socket id:`, game.currentTurn);
-  });
-
-  socket.on('placeBid', ({ count, face }) => {
-    const rooms = Array.from(socket.rooms).filter(r => r !== socket.id);
-    if (!rooms.length) return;
-    const room = rooms[0];
-    const game = games[room];
-    if (!game) return;
-
-    if (socket.id !== game.currentTurn) {
-      socket.emit('errorMsg', 'It is not your turn!');
-      return;
-    }
-
-    if (game.bids.length > 0) {
-      const lastBid = game.bids[game.bids.length -1];
-      if (count < lastBid.count || (count === lastBid.count && face <= lastBid.face)) {
-        socket.emit('errorMsg', 'Bid must be higher than previous bid.');
-        return;
-      }
-    }
-
-    game.bids.push({ playerId: socket.id, count, face });
-
-    io.to(room).emit('updateBids', game.bids.map(b => ({
-      count: b.count,
-      face: b.face,
-      player: game.players[b.playerId]?.name || 'Unknown',
-    })));
-
-    io.to(room).emit('log', `${game.players[socket.id].name} bids ${count} × ${face}'s.`);
-
-    const currentIndex = game.order.indexOf(game.currentTurn);
-    game.currentTurn = game.order[(currentIndex + 1) % game.order.length];
-
-    io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
-    io.to(room).emit('currentTurn', game.currentTurn);
-
-    console.log(`Current turn socket id:`, game.currentTurn);
-  });
-
-  socket.on('callFluff', () => {
-    const rooms = Array.from(socket.rooms).filter(r => r !== socket.id);
-    if (!rooms.length) return;
-    const room = rooms[0];
-    const game = games[room];
-    if (!game) return;
-
-    if (socket.id !== game.currentTurn) {
-      socket.emit('errorMsg', 'You can only call fluff on your own turn!');
-      return;
-    }
-
-    if (game.bids.length === 0) {
-      socket.emit('errorMsg', 'No bids to challenge!');
-      return;
-    }
-
-    const lastBid = game.bids[game.bids.length - 1];
-
-    let totalMatching = 0;
-    for (const p of Object.values(game.players)) {
-      totalMatching += p.dice.filter(d => d === lastBid.face).length;
-    }
-
-    io.to(room).emit('log', `${game.players[socket.id].name} calls fluff!`);
-    io.to(room).emit('log', `There are ${totalMatching} dice showing ${lastBid.face}.`);
-
-    if (totalMatching >= lastBid.count) {
-      game.players[socket.id].dice.pop();
-      io.to(room).emit('log', `${game.players[socket.id].name} loses a die!`);
-      const idx = game.order.indexOf(socket.id);
-      game.currentTurn = game.order[(idx + 1) % game.order.length];
-    } else {
-      game.players[lastBid.playerId].dice.pop();
-      io.to(room).emit('log', `${game.players[lastBid.playerId].name} loses a die!`);
-      game.currentTurn = lastBid.playerId;
-    }
-
-    game.bids = [];
-
-    for (const [id, p] of Object.entries(game.players)) {
-      io.to(id).emit('updateDice', p.dice);
-    }
-
-    io.to(room).emit('updateBids', []);
-
-    for (const [id, p] of Object.entries(game.players)) {
-      if (p.dice.length === 0) {
-        io.to(room).emit('log', `${p.name} is out of the game.`);
-        delete game.players[id];
-        game.order = game.order.filter(pid => pid !== id);
-        if (game.currentTurn === id && game.order.length > 0) {
-          game.currentTurn = game.order[0];
+        const newBid = { quantity, face };
+        if (!isValidBid(newBid, game.currentBid)) {
+            socket.emit("invalidBid", "Bid must be higher than the previous bid or equal total with different combo");
+            return;
         }
-      }
-    }
 
-    if (game.order.length === 1) {
-      io.to(room).emit('log', `${game.players[game.order[0]].name} wins the game!`);
-      delete games[room];
-      return;
-    }
+        game.currentBid = newBid;
+        io.to(roomId).emit("bidMade", { player: game.players[game.turnIndex].name, bid: newBid });
+        nextTurn(roomId);
+    });
 
-    io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
-    io.to(room).emit('currentTurn', game.currentTurn);
+    socket.on("fluff", roomId => {
+        let game = games[roomId];
+        if (!game) return;
 
-    console.log(`Current turn socket id:`, game.currentTurn);
-  });
+        let prevIndex = (game.turnIndex - 1 + game.players.length) % game.players.length;
+        let prevPlayer = game.players[prevIndex].name;
 
-  socket.on('disconnect', () => {
-    for (const [room, game] of Object.entries(games)) {
-      if (game.players[socket.id]) {
-        io.to(room).emit('log', `${game.players[socket.id].name} disconnected.`);
-        delete game.players[socket.id];
-        game.order = game.order.filter(id => id !== socket.id);
-        io.to(room).emit('updatePlayers', Object.values(game.players).map(p => p.name));
-        if (game.currentTurn === socket.id && game.order.length > 0) {
-          game.currentTurn = game.order[0];
-          io.to(room).emit('log', `It's ${game.players[game.currentTurn].name}'s turn.`);
-          io.to(room).emit('currentTurn', game.currentTurn);
+        io.to(roomId).emit("fluffCalled", { by: game.players[game.turnIndex].name, on: prevPlayer });
+        // You can add dice reveal/check logic here
+        game.currentBid = null;
+        nextTurn(roomId);
+    });
+
+    socket.on("disconnect", () => {
+        for (let roomId in games) {
+            let game = games[roomId];
+            game.players = game.players.filter(p => p.id !== socket.id);
+            io.to(roomId).emit("gameUpdate", game);
         }
-        if (game.order.length === 0) {
-          delete games[room];
-        }
-      }
-    }
-  });
+    });
 });
 
-http.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+http.listen(3000, () => {
+    console.log("Server listening on port 3000");
 });
