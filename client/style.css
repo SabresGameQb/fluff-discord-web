@@ -1,0 +1,19 @@
+:root {
+  --bg: #121212;
+  --card: #1e1e1e;
+  --muted: #bdbdbd;
+  --accent: #6c5ce7;
+}
+body {
+  background: var(--bg);
+  color: #eee;
+  font-family: system-ui, Arial, sans-serif;
+  padding: 20px;
+}
+.card { background: var(--card); padding:16px; border-radius:8px; max-width:900px; margin:12px auto; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
+input { background:#262626; color:#fff; border:1px solid #333; padding:8px; border-radius:6px; margin:6px 4px; }
+button { background:var(--accent); color:#fff; border:none; padding:8px 12px; border-radius:6px; margin:6px; cursor:pointer; }
+button:disabled { background:#444; cursor:not-allowed; }
+#yourDice span { display:inline-block; padding:8px 12px; margin:6px; border-radius:6px; background:#2b2b2b; font-weight:bold; }
+#roundLog { margin-top:12px; background:#101010; padding:8px; border-radius:6px; min-height:40px; overflow:auto; color:var(--muted);}
+ul { padding-left: 18px; }
