@@ -1,0 +1,57 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 10px;
+  background: #f9f9f9;
+  color: #333;
+}
+
+h1, h2, h3 {
+  color: #4a90e2;
+}
+
+input, button {
+  padding: 8px;
+  margin: 5px 3px;
+  font-size: 1em;
+}
+
+button {
+  cursor: pointer;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 3px;
+}
+
+button:hover {
+  background-color: #357ABD;
+}
+
+.die {
+  display: inline-block;
+  padding: 10px 15px;
+  margin: 5px;
+  background: #ddd;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+#log {
+  margin-top: 20px;
+  height: 150px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  background: white;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.container {
+  background: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 5px #ccc;
+}
