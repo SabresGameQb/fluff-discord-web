@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Fluff — Liar's Dice (Dark)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card" id="joinCard">
+    <h1>Fluff — Liar's Dice</h1>
+    <div>
+      <input id="name" placeholder="Your name" />
+      <input id="room" placeholder="Room ID (e.g. friends-room)" />
+      <button id="joinBtn">Join Room</button>
+    </div>
+    <div id="joinStatus"></div>
+  </div>
+
+  <div class="card" id="gameCard" style="display:none;">
+    <h2>Room: <span id="roomId"></span></h2>
+    <div id="playersArea"><h3>Players</h3><ul id="playersList"></ul></div>
+
+    <div id="privateDiceArea">
+      <h3>Your dice</h3>
+      <div id="yourDice"></div>
+    </div>
+
+    <div>
+      <h3>Current bid</h3>
+      <div id="currentBid">—</div>
+    </div>
+
+    <div id="controls">
+      <div id="turnInfo">Waiting...</div>
+      <input id="bidQty" type="number" min="1" placeholder="Qty" />
+      <input id="bidFace" type="number" min="1" max="6" placeholder="Face (1-6)" />
+      <button id="placeBid">Place Bid</button>
+      <button id="callBtn">Call Fluff</button>
+    </div>
+
+    <div id="roundLog"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
