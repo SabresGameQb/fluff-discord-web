@@ -55,6 +55,10 @@ app.post('/create', (req, res) => {
   res.json({ gameId, link });
 });
 
+app.get('/', (req, res) => {
+  res.send('Welcome to Fluff (Liar\'s Dice) Game! Join a game by connecting through your client.');
+});
+
 io.on('connection', socket => {
   console.log('socket connected', socket.id);
 
@@ -285,3 +289,4 @@ server.listen(PORT, () => {
   console.log(`Server listening on ${PORT}`);
   console.log(`Create games by POST /create (returns link). Or open / and create from UI.`);
 });
+
